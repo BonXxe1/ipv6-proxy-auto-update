@@ -3,13 +3,17 @@ name: Auto Update Proxies (Multi-Source)
 on:
   schedule:
     - cron: '0 0 * * *'  # 每天UTC 00:00（北京08:00）
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 修复exit 128：允许push
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 完整历史，防fetch bug
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -20,15 +24,15 @@ jobs:
       run: pip install requests
 
     - name: Fetch, Test & Update Proxies
-      run: python auto_update_proxies.py  # 运行多源脚本
+      run: python auto_update_proxies.py
 
     - name: Commit changes
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
         git add proxies_success.txt
         if git diff --staged --quiet; then
-          echo "No changes"
+          echo "No changes to commit"
         else
           git commit -m "Auto update proxies (multi-source) - $(date)"
           git push
@@ -36,4 +40,4 @@ jobs:
 
     - name: Notify
       if: success()
-      run: echo "Proxies updated! Check proxies_success.txt"
+      run: echo "Proxies updated successfully! Check proxies_success.txt"
