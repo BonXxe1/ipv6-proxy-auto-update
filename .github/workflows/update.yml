@@ -7,32 +7,37 @@ on:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest:2024  # 指定稳定镜像，避免buggy版本
+    timeout-minutes: 60  # Job整体超时1小时
     permissions:
       contents: write
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+      timeout-minutes: 5  # 步骤超时
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+      timeout-minutes: 5
 
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install requests pysocks ipaddress || echo "Dependency install failed, but continue"
-      continue-on-error: true  # 容错pip失败
+        pip install requests pysocks ipaddress --timeout=300  # pip超时5分钟
+      timeout-minutes: 10
+      continue-on-error: true
 
     - name: Fetch, Test & Update IPv6 Proxies
       run: |
         echo "Starting script with debug mode..."
         python -c "import sys; print('Python version:', sys.version)"
-        python auto_update_ipv6_proxies.py 2>&1 || echo "Script failed with exit 1 - check above errors"
+        python auto_update_ipv6_proxies.py 2>&1 || echo "Script interrupted - likely timeout/network"
       shell: bash
-      continue-on-error: true  # 防止脚本失败终止工作流
+      timeout-minutes: 30  # 脚本超时30分钟（IPv6测试易长）
+      continue-on-error: true
 
     - name: Commit changes
       run: |
@@ -41,6 +46,7 @@ jobs:
         git add proxies_success.txt || echo "Add failed"
         git commit -m "Auto update IPv6 proxies - $(date)" || echo "No changes or commit failed"
         git push || echo "Push failed"
+      timeout-minutes: 5
       continue-on-error: true
 
     - name: Debug Output
@@ -49,4 +55,4 @@ jobs:
         echo "=== Final Debug ==="
         ls -la proxies_success.txt || echo "File not created"
         head -10 proxies_success.txt || echo "File empty or missing"
-        echo "Workflow ended - check logs for Python errors"
+        echo "Workflow ended - check for shutdown signals or timeouts"
